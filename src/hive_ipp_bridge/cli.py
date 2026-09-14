@@ -6,12 +6,14 @@ Developed by Edge Case Software — https://edgecasesoftware.dev
 from __future__ import annotations
 
 import argparse
-
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from . import enrollment, ipp_command, submit
 
@@ -19,6 +21,7 @@ from . import enrollment, ipp_command, submit
 APPLICATION = "hive-ipp-bridge"
 QUEUE_NAME = "Hive_IPP_Bridge"
 LEGACY_QUEUE_NAMES = ("PaperCut_Hive",)
+LEGACY_SERVICE_NAMES = ("papercut-hive-printer.service",)
 DEVICE_URI = "ipp://localhost:8631/ipp/print"
 INSTALL_DIR = Path.home() / ".local/lib/hive-ipp-bridge"
 LAUNCHER = Path.home() / ".local/bin/hive-ipp-bridge"
@@ -128,6 +131,20 @@ def queue_uri(queue_name: str = QUEUE_NAME) -> str | None:
                  if line.startswith(prefix)), None)
 
 
+def wait_for_printer(uri: str = DEVICE_URI, timeout: float = 5.0) -> bool:
+    parsed = urlsplit(uri)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 8631
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=0.2):
+                return True
+        except OSError:
+            time.sleep(0.1)
+    return False
+
+
 def setup_command(_args: argparse.Namespace) -> int:
     if not require_commands(("secret-tool", "systemctl", "lpadmin", "lpstat", "ippeveprinter")):
         return 1
@@ -140,8 +157,12 @@ def setup_command(_args: argparse.Namespace) -> int:
         print(f"error: {QUEUE_NAME} points to {existing_uri}; leaving it untouched", file=sys.stderr)
         return 1
 
-    if not all(secret_lookup(key) for key in CREDENTIALS) and not enroll_credentials():
-        return 1
+    for legacy_service in LEGACY_SERVICE_NAMES:
+        legacy_path = Path.home() / ".config/systemd/user" / legacy_service
+        if legacy_path.exists():
+            if shutil.which("systemctl"):
+                run(["systemctl", "--user", "disable", "--now", legacy_service])
+            legacy_path.unlink()
 
     service_path = Path.home() / ".config/systemd/user" / SERVICE_NAME
     service_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,11 +174,19 @@ def setup_command(_args: argparse.Namespace) -> int:
             print(result.stderr.strip() or f"error: {' '.join(command)} failed", file=sys.stderr)
             return 1
 
+    if not wait_for_printer():
+        print("error: timed out waiting for the local IPP printer service to start", file=sys.stderr)
+        return 1
+
     if not existing_uri:
         result = run(["lpadmin", "-p", QUEUE_NAME, "-E", "-v", DEVICE_URI, "-m", "everywhere"])
         if result.returncode:
             print(result.stderr.strip() or "error: could not create the CUPS queue", file=sys.stderr)
             return 1
+
+    if not all(secret_lookup(key) for key in CREDENTIALS) and not enroll_credentials():
+        return 1
+
     print("Hive IPP Bridge is set up and ready.")
     return 0
 
@@ -238,13 +267,14 @@ def uninstall_command(args: argparse.Namespace) -> int:
         if uri and run(["lpadmin", "-x", queue_name]).returncode:
             print(f"error: could not remove CUPS queue {queue_name}", file=sys.stderr)
             return 1
-    service_path = Path.home() / ".config/systemd/user" / SERVICE_NAME
-    if shutil.which("systemctl"):
-        run(["systemctl", "--user", "disable", "--now", SERVICE_NAME])
-    if service_path.exists():
-        service_path.unlink()
+    for service_name in (SERVICE_NAME, *LEGACY_SERVICE_NAMES):
+        service_path = Path.home() / ".config/systemd/user" / service_name
         if shutil.which("systemctl"):
-            run(["systemctl", "--user", "daemon-reload"])
+            run(["systemctl", "--user", "disable", "--now", service_name])
+        if service_path.exists():
+            service_path.unlink()
+    if shutil.which("systemctl"):
+        run(["systemctl", "--user", "daemon-reload"])
     purge = args.purge or args.full
     if purge:
         if not require_commands(("secret-tool",)):

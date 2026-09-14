@@ -16,19 +16,28 @@ def completed(returncode: int = 0, stdout: str = "", stderr: str = ""):
 
 
 class CliTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.patcher = patch.object(cli.Path, "home", return_value=Path(self.tmp_dir.name))
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+        self.tmp_dir.cleanup()
+
     @patch.dict(os.environ, {}, clear=True)
     @patch.object(cli, "secret_store", return_value=True)
     @patch.object(cli.enrollment, "claim")
-    @patch.object(cli.getpass, "getpass", return_value="private-link")
-    def test_enrollment_prompts_privately_and_stores_claimed_credentials(
-        self, getpass, claim, store
+    @patch("builtins.input", return_value="pasted-link")
+    def test_enrollment_prompts_and_stores_claimed_credentials(
+        self, prompt_input, claim, store
     ):
         claim.return_value = cli.enrollment.Credentials("jwt", "client", "org")
 
         self.assertTrue(cli.enroll_credentials())
 
-        getpass.assert_called_once()
-        claim.assert_called_once_with("private-link")
+        prompt_input.assert_called_once()
+        claim.assert_called_once_with("pasted-link")
         self.assertEqual(
             store.call_args_list,
             [unittest.mock.call("client-id", "client"),
@@ -40,9 +49,9 @@ class CliTests(unittest.TestCase):
     @patch.object(cli, "secret_clear")
     @patch.object(cli, "secret_store", side_effect=(True, False))
     @patch.object(cli.enrollment, "claim")
-    @patch.object(cli.getpass, "getpass", return_value="private-link")
+    @patch("builtins.input", return_value="pasted-link")
     def test_enrollment_rolls_back_partial_keyring_write(
-        self, _getpass, claim, _store, clear
+        self, _input, claim, _store, clear
     ):
         claim.return_value = cli.enrollment.Credentials("jwt", "client", "org")
 
@@ -90,6 +99,39 @@ class CliTests(unittest.TestCase):
     def test_uninstall_reports_cups_failure(self, _queue_uri, _requirements):
         self.assertEqual(cli.uninstall_command(argparse.Namespace(purge=False, full=False)), 1)
 
+
+    @patch.object(cli.socket, "create_connection")
+    def test_wait_for_printer_succeeds_when_port_opens(self, create_connection):
+        self.assertTrue(cli.wait_for_printer("ipp://localhost:8631/ipp/print", timeout=0.1))
+        create_connection.assert_called_once_with(("localhost", 8631), timeout=0.2)
+
+    @patch.object(cli.time, "sleep")
+    @patch.object(cli.socket, "create_connection", side_effect=OSError("connection refused"))
+    def test_wait_for_printer_times_out(self, create_connection, _sleep):
+        self.assertFalse(cli.wait_for_printer("ipp://localhost:8631/ipp/print", timeout=0.01))
+        self.assertTrue(create_connection.called)
+
+    @patch.object(cli, "require_commands", return_value=True)
+    @patch.object(cli, "queue_uri", return_value=None)
+    @patch.object(cli, "wait_for_printer", return_value=False)
+    @patch.object(cli, "run", return_value=completed())
+    def test_setup_aborts_before_enrollment_if_printer_fails_to_start(self, _run, _wait, _queue_uri, _req):
+        with patch.object(cli, "enroll_credentials") as enroll:
+            self.assertEqual(cli.setup_command(unittest.mock.Mock()), 1)
+            enroll.assert_not_called()
+
+    @patch.object(cli, "require_commands", return_value=True)
+    @patch.object(cli, "queue_uri", return_value=None)
+    @patch.object(cli, "wait_for_printer", return_value=True)
+    @patch.object(cli, "secret_lookup", return_value=None)
+    @patch.object(cli, "enroll_credentials", return_value=True)
+    @patch.object(cli, "run", return_value=completed())
+    def test_setup_starts_service_and_queue_before_enrolling(self, run, enroll, _lookup, _wait, _queue, _req):
+        self.assertEqual(cli.setup_command(unittest.mock.Mock()), 0)
+        run_cmds = [call.args[0] for call in run.call_args_list]
+        lpadmin_calls = [cmd for cmd in run_cmds if cmd and cmd[0] == "lpadmin"]
+        self.assertTrue(len(lpadmin_calls) > 0)
+        enroll.assert_called_once()
 
     def test_full_remove_deletes_only_managed_install(self):
         with tempfile.TemporaryDirectory() as directory:

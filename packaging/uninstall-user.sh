@@ -27,12 +27,15 @@ for queue_name in Hive_IPP_Bridge PaperCut_Hive; do
     fi
 done
 
-systemctl --user disable --now "$service_name" >/dev/null 2>&1 || true
-if [[ -f $service_file ]]; then
-    rm -- "$service_file"
-    systemctl --user daemon-reload
-    echo "Removed user service $service_name."
-fi
+for service_name in hive-ipp-bridge.service papercut-hive-printer.service; do
+    service_file="$HOME/.config/systemd/user/$service_name"
+    systemctl --user disable --now "$service_name" >/dev/null 2>&1 || true
+    if [[ -f $service_file ]]; then
+        rm -- "$service_file"
+        systemctl --user daemon-reload
+        echo "Removed user service $service_name."
+    fi
+done
 
 for file in __init__.py __main__.py cli.py enrollment.py ipp_command.py submit.py; do
     file="$package_dir/$file"
