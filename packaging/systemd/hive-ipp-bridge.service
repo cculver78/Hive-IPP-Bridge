@@ -1,0 +1,11 @@
+[Unit]
+Description=Hive IPP Bridge user printer
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/ippeveprinter -n localhost -r off -2 -s 10,10 -f application/pdf -F application/pdf -p 8631 -c /usr/lib/hive-ipp-bridge/ipp_command.py "Hive IPP Bridge"
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

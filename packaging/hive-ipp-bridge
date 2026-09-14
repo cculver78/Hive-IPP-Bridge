@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+HIVE_IPP_BRIDGE_LAUNCHER=1
+install_dir=${HIVE_IPP_BRIDGE_LIBDIR:-"$HOME/.local/lib/hive-ipp-bridge"}
+PYTHONPATH="$install_dir${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m hive_ipp_bridge "$@"
