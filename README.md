@@ -58,8 +58,8 @@ For upgrades from the working prototype, uninstall also recognizes the legacy
 ## Windows support
 
 Windows 10 and Windows 11 x64 are supported. The packaged Windows application
-does not require Python or pip on classroom workstations. See the complete
-[Windows setup and classroom deployment guide](General/WINDOWS_SETUP.md) for
+does not require Python or pip on user workstations. See the complete
+[Windows setup and user deployment guide](General/WINDOWS_SETUP.md) for
 prerequisites, upgrades, verification, security details, and troubleshooting.
 
 The Windows path is:
@@ -97,7 +97,7 @@ An administrator runs the system installation once:
 .\install-system.ps1
 ```
 
-Then each classroom user signs in and runs this normally, not as administrator:
+Then each user signs in and runs this normally, not as administrator:
 
 ```powershell
 & "$env:ProgramFiles\Hive IPP Bridge\Install-User.ps1"

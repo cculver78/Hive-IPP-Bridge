@@ -1,7 +1,7 @@
-# Windows setup and classroom deployment
+# Windows setup and user deployment
 
 Hive IPP Bridge supports Windows 10 and Windows 11 x64. The Windows design is
-intended for shared classroom computers: an administrator installs the machine
+intended for shared user computers: an administrator installs the machine
 components once, and each signed-in user enrolls independently without UAC.
 No user prints through another user's PaperCut Hive credentials.
 
@@ -16,7 +16,7 @@ The computer needs:
 - one PaperCut Hive Classic Invitation setup link for each user.
 
 Python, pip, and Inno Setup are needed only on the computer that builds the
-installer. They are not needed on classroom computers.
+installer. They are not needed on user computers.
 
 ## Deployment roles
 
@@ -26,8 +26,8 @@ The machine and user installations are deliberately separate:
 | --- | --- | --- | --- |
 | Build installer | Developer or packager | No | For each release |
 | Install system portion | Administrator or IT deployment | One UAC prompt | Once per computer or upgrade |
-| Install user portion | The signed-in classroom user | No | Once per Windows user |
-| Uninstall user portion | The signed-in classroom user | No | When removing that user's profile |
+| Install user portion | The signed-in user | No | Once per Windows user |
+| Uninstall user portion | The signed-in user | No | When removing that user's profile |
 | Uninstall system portion | Administrator or IT deployment | One UAC prompt | Once per computer |
 
 Do not run a user install or user uninstall from an elevated Administrator
@@ -50,7 +50,7 @@ dist\installer\HiveIPPBridge-Setup.exe
 dist\installer\install-system.ps1
 ```
 
-Keep those two files together when copying them to a classroom computer.
+Keep those two files together when copying them to a user computer.
 PyInstaller is not a cross-compiler, so this build must run on Windows.
 
 ## Install the system portion
@@ -85,7 +85,7 @@ succeed.
 
 ## Install each user's portion
 
-Sign in as the classroom user who will print. Open a normal, non-elevated
+Sign in as the user who will print. Open a normal, non-elevated
 PowerShell window and run:
 
 ```powershell
@@ -109,7 +109,7 @@ Hive IPP Bridge (alice-a1b2c3d4)
 ```
 
 The suffix is derived from the Windows SID so accounts with similar names do
-not collide. Repeat this section after signing in as every classroom user.
+not collide. Repeat this section after signing in as every user.
 Running the script again is safe: usable credentials are reused and the queue
 is verified or repaired without requesting another setup link.
 

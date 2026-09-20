@@ -5,10 +5,10 @@
 - Make Windows ProgramData ACLs inheritable so Administrators can inspect service-created logs, and return safe control-pipe processing diagnostics instead of silently disconnecting clients.
 - Fix the Windows control client import required to open restricted named pipes from the per-user setup command.
 - Isolate the Windows multi-user vault unit test from production ProgramData ACL changes so unelevated Windows builds can run the test suite safely.
-- Expand Windows documentation into separate build, administrator deployment, per-user enrollment, verification, upgrade, removal, security, and troubleshooting workflows for shared classroom computers.
+- Expand Windows documentation into separate build, administrator deployment, per-user enrollment, verification, upgrade, removal, security, and troubleshooting workflows for shared user computers.
 - Add separate scripts for removing the current user's queue and credentials or uninstalling the machine components with optional profile purging.
 - Add simple Windows scripts to build the final Inno installer, install machine services with one UAC prompt, and enroll each signed-in user without elevation.
-- Replace the single-user Windows profile with SID-authenticated per-user DPAPI profiles, private IPP routes, owner-only queues, and a credential-blind provisioning service so classroom users never print through another user's PaperCut identity.
+- Replace the single-user Windows profile with SID-authenticated per-user DPAPI profiles, private IPP routes, owner-only queues, and a credential-blind provisioning service so users never print through another user's PaperCut identity.
 - Split Windows administration from enrollment: the installer provisions machine services once, while each signed-in user can run setup and remove their own profile without UAC.
 - Make the Windows IPP discovery response HTTP/1.1 compliant and advertise valid required printer capabilities, enum types, and UUID metadata for Microsoft IPP Class Driver installation.
 - Flush Windows named-pipe responses before disconnecting and isolate per-client failures so control requests are delivered reliably without stopping the pipe server.
