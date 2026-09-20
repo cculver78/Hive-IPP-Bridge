@@ -13,12 +13,28 @@ import secrets
 import sys
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from .config import DEFAULT_ENDPOINT
+    from .enrollment import Credentials
+except ImportError:  # Support the existing Linux ippeveprinter adapter's script-mode invocation.
+    from config import DEFAULT_ENDPOINT
+    from enrollment import Credentials
 
-DEFAULT_ENDPOINT = "https://cloudnode.pmitc.papercut.com/print"
+
 CLIENT_TYPE = "ChromeApp-2.4.1"
+
+
+@dataclass(frozen=True)
+class SubmissionResult:
+    """Safe result information returned by a Hive submission."""
+
+    accepted: bool
+    message: str
+    status_code: int | None = None
 
 
 def request_id() -> str:
@@ -61,6 +77,71 @@ def multipart_body(fields: dict[str, str], pdf: Path) -> tuple[bytes, str]:
     return b"".join(chunks), boundary
 
 
+def _validate_document(pdf: Path, copies: int) -> str | None:
+    if not pdf.is_file():
+        return f"PDF not found: {pdf}"
+    if pdf.suffix.lower() != ".pdf":
+        return "PaperCut Hive expects an application/pdf document"
+    if copies < 1 or copies > 100:
+        return "copies must be between 1 and 100"
+    return None
+
+
+def submit_pdf(
+    pdf: Path,
+    credentials: Credentials,
+    *,
+    copies: int = 1,
+    duplex: str = "NO_DUPLEX",
+    color: str = "STANDARD_COLOR",
+    width: int = 215900,
+    height: int = 279400,
+    title: str | None = None,
+    endpoint: str = DEFAULT_ENDPOINT,
+) -> SubmissionResult:
+    """Submit a PDF with explicit credentials without exposing them to a shell."""
+
+    validation_error = _validate_document(pdf, copies)
+    if validation_error:
+        return SubmissionResult(False, validation_error)
+    if duplex not in {"NO_DUPLEX", "LONG_EDGE", "SHORT_EDGE"}:
+        return SubmissionResult(False, "invalid duplex setting")
+    if color not in {"STANDARD_COLOR", "STANDARD_MONOCHROME", "AUTO"}:
+        return SubmissionResult(False, "invalid color setting")
+
+    fields = {
+        "copies": str(copies),
+        "duplex": duplex,
+        "color": color,
+        "mediaWidthMicrons": str(width),
+        "mediaHeightMicrons": str(height),
+        "fileFormat": "application/pdf",
+        "documentName": title or pdf.stem,
+    }
+    body, boundary = multipart_body(fields, pdf)
+    headers = {
+        "Authorization": f"Bearer {credentials.jwt}",
+        "client-id": credentials.client_id,
+        "client-type": CLIENT_TYPE,
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Encrypted": "true",
+        "PMITC-PrintRequest-Id": request_id(),
+        "X-Correlation-ID": f"CHROME-PRINT-CLIENT|{secrets.token_urlsafe(15)[:20]}",
+        "X-PMITC-OrgId": credentials.organization_id,
+    }
+    request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            if response.status != 200:
+                return SubmissionResult(False, f"PaperCut returned HTTP {response.status}", response.status)
+    except urllib.error.HTTPError as error:
+        return SubmissionResult(False, f"PaperCut returned HTTP {error.code}", error.code)
+    except urllib.error.URLError as error:
+        return SubmissionResult(False, f"unable to reach PaperCut: {error.reason}")
+
+    return SubmissionResult(True, "PaperCut Hive accepted the print job.", 200)
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pdf", type=Path, help="PDF file to submit")
@@ -82,14 +163,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    if not args.pdf.is_file():
-        print(f"error: PDF not found: {args.pdf}", file=sys.stderr)
-        return 2
-    if args.pdf.suffix.lower() != ".pdf":
-        print("error: PaperCut Hive expects an application/pdf document", file=sys.stderr)
-        return 2
-    if args.copies < 1 or args.copies > 100:
-        print("error: copies must be between 1 and 100", file=sys.stderr)
+    validation_error = _validate_document(args.pdf, args.copies)
+    if validation_error:
+        print(f"error: {validation_error}", file=sys.stderr)
         return 2
 
     fields = {
@@ -108,37 +184,27 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     credential_names = ("PAPERCUT_HIVE_JWT", "PAPERCUT_HIVE_CLIENT_ID", "PAPERCUT_HIVE_ORG_ID")
-    credentials = {name: os.environ.get(name) for name in credential_names}
-    missing = [name for name, value in credentials.items() if not value]
+    values = {name: os.environ.get(name) for name in credential_names}
+    missing = [name for name, value in values.items() if not value]
     if missing:
         print(f"error: missing environment variable(s): {', '.join(missing)}", file=sys.stderr)
         return 2
 
-    body, boundary = multipart_body(fields, args.pdf)
-    headers = {
-        "Authorization": f"Bearer {credentials['PAPERCUT_HIVE_JWT']}",
-        "client-id": credentials["PAPERCUT_HIVE_CLIENT_ID"],
-        "client-type": CLIENT_TYPE,
-        "Content-Type": f"multipart/form-data; boundary={boundary}",
-        "Encrypted": "true",
-        "PMITC-PrintRequest-Id": request_id(),
-        "X-Correlation-ID": f"CHROME-PRINT-CLIENT|{secrets.token_urlsafe(15)[:20]}",
-        "X-PMITC-OrgId": credentials["PAPERCUT_HIVE_ORG_ID"],
-    }
-    request = urllib.request.Request(args.endpoint, data=body, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            if response.status != 200:
-                print(f"error: PaperCut returned HTTP {response.status}", file=sys.stderr)
-                return 1
-    except urllib.error.HTTPError as error:
-        print(f"error: PaperCut returned HTTP {error.code}", file=sys.stderr)
+    result = submit_pdf(
+        args.pdf,
+        Credentials(values[credential_names[0]] or "", values[credential_names[1]] or "", values[credential_names[2]] or ""),
+        copies=args.copies,
+        duplex=args.duplex,
+        color=args.color,
+        width=args.width,
+        height=args.height,
+        title=args.title,
+        endpoint=args.endpoint,
+    )
+    if not result.accepted:
+        print(f"error: {result.message}", file=sys.stderr)
         return 1
-    except urllib.error.URLError as error:
-        print(f"error: unable to reach PaperCut: {error.reason}", file=sys.stderr)
-        return 1
-
-    print("PaperCut Hive accepted the print job.")
+    print(result.message)
     return 0
 
 

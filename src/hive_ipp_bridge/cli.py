@@ -16,13 +16,13 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import enrollment, ipp_command, submit
+from .config import APPLICATION, IPP_PORT, LINUX_DEVICE_URI, LINUX_QUEUE_NAME
 
 
-APPLICATION = "hive-ipp-bridge"
-QUEUE_NAME = "Hive_IPP_Bridge"
+QUEUE_NAME = LINUX_QUEUE_NAME
 LEGACY_QUEUE_NAMES = ("PaperCut_Hive",)
 LEGACY_SERVICE_NAMES = ("papercut-hive-printer.service",)
-DEVICE_URI = "ipp://localhost:8631/ipp/print"
+DEVICE_URI = LINUX_DEVICE_URI
 INSTALL_DIR = Path.home() / ".local/lib/hive-ipp-bridge"
 LAUNCHER = Path.home() / ".local/bin/hive-ipp-bridge"
 SERVICE_NAME = "hive-ipp-bridge.service"
@@ -134,7 +134,7 @@ def queue_uri(queue_name: str = QUEUE_NAME) -> str | None:
 def wait_for_printer(uri: str = DEVICE_URI, timeout: float = 5.0) -> bool:
     parsed = urlsplit(uri)
     host = parsed.hostname or "localhost"
-    port = parsed.port or 8631
+    port = parsed.port or IPP_PORT
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -308,5 +308,9 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    if sys.platform == "win32":
+        from .windows.platform_cli import main as windows_main
+
+        return windows_main()
     args = parser().parse_args()
     return args.handler(args)

@@ -1,5 +1,34 @@
 # Changelog
 
+- Keep Windows listener tests skippable in Linux environments that prohibit local socket binding.
+- Fix Windows system uninstallation to request the service deletion access right from the correct pywin32 module.
+- Make Windows ProgramData ACLs inheritable so Administrators can inspect service-created logs, and return safe control-pipe processing diagnostics instead of silently disconnecting clients.
+- Fix the Windows control client import required to open restricted named pipes from the per-user setup command.
+- Isolate the Windows multi-user vault unit test from production ProgramData ACL changes so unelevated Windows builds can run the test suite safely.
+- Expand Windows documentation into separate build, administrator deployment, per-user enrollment, verification, upgrade, removal, security, and troubleshooting workflows for shared classroom computers.
+- Add separate scripts for removing the current user's queue and credentials or uninstalling the machine components with optional profile purging.
+- Add simple Windows scripts to build the final Inno installer, install machine services with one UAC prompt, and enroll each signed-in user without elevation.
+- Replace the single-user Windows profile with SID-authenticated per-user DPAPI profiles, private IPP routes, owner-only queues, and a credential-blind provisioning service so classroom users never print through another user's PaperCut identity.
+- Split Windows administration from enrollment: the installer provisions machine services once, while each signed-in user can run setup and remove their own profile without UAC.
+- Make the Windows IPP discovery response HTTP/1.1 compliant and advertise valid required printer capabilities, enum types, and UUID metadata for Microsoft IPP Class Driver installation.
+- Flush Windows named-pipe responses before disconnecting and isolate per-client failures so control requests are delivered reliably without stopping the pipe server.
+- Fix named-pipe response decoding so valid service replies containing `ok` are not rejected for lacking a request-only `op` field.
+- Rework Windows named-pipe security attributes using pywin32's native ACL pattern, adequately sized ACL buffers, fixed well-known SIDs, file-specific access masks, explicit startup failure reporting, and control-pipe-first readiness ordering.
+- Restart the managed Windows service during setup so updated packaged code is loaded immediately.
+- Fix named-pipe ACLs so the LocalService server can create pipe instances while enrolled users remain limited to read/write access.
+- Make Windows named-pipe control connections retry during service startup to avoid a listener/control-pipe readiness race.
+- Fix existing Windows service updates to pass a numeric tag ID to pywin32 `ChangeServiceConfig`.
+- Fix Windows service recovery configuration to use the dictionary format required by pywin32.
+- Fix Windows service setup so existing-service access errors are not mistaken for a missing service and do not trigger a duplicate `CreateService` call.
+- Fix Windows ACL setup to use pywin32 generic access constants from `win32con`.
+- Surface Windows service and printer elevation errors in the invoking console instead of only returning a silent failure code.
+- Fix Windows UAC helper argument quoting so service and printer administrative operations work from paths containing spaces.
+- Fix the PyInstaller entrypoint so the frozen Windows executable can start its CLI and service modes.
+- Windows build script now discovers an installed CPython runtime, gracefully falls back when `py -3.12` is unavailable, supports Python 3.12+, and reports incomplete virtual environments clearly, including under PowerShell strict mode.
+- Windows build documentation now supports both Inno Setup 7 x64 and Inno Setup 6 compiler locations.
+- Windows installer cleanup now assigns a `RunOnceId` to its uninstall hook.
+
+- Add a native Windows service, localhost IPP endpoint, secure service-owned credential vault, Microsoft IPP Class Driver printer setup, Windows lifecycle commands, and PyInstaller/Inno Setup packaging while preserving Linux behavior.
 - Ensure the printer service and CUPS queue are running and ready before prompting for enrollment credentials during setup.
 - Add socket readiness check to eliminate the `Host is down` race condition with `lpadmin`.
 - Automatically decommission legacy `papercut-hive-printer.service` during setup and uninstallation.

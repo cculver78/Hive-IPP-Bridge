@@ -1,20 +1,21 @@
 # Hive IPP Bridge
 
-Hive IPP Bridge is an independent, unofficial Linux compatibility client that
-submits local IPP print jobs to PaperCut Hive. It is not affiliated with,
+Hive IPP Bridge is an independent, unofficial Linux and Windows compatibility
+client that submits local IPP print jobs to PaperCut Hive. It is not affiliated with,
 endorsed by, or supported by PaperCut Software.
 
 Developed and maintained by [Edge Case Software](https://edgecasesoftware.dev).
 
-This distribution project is being derived from a working local prototype. It is
-not ready for installation yet. The first supported package target will be Arch
-Linux/CachyOS, followed by distribution-neutral packaging once enrollment and
-credential lifecycle handling are complete.
+The Linux implementation uses a user-level CUPS queue and systemd service. The
+Windows implementation uses the Windows Print Spooler, the Microsoft IPP Class
+Driver, a LocalService runtime, and a credential-blind provisioning service.
+Both platforms use the same independent enrollment and Hive job-submission
+implementation.
 
 The project code is released under the [MIT License](LICENSE). The license does not
 grant rights to PaperCut trademarks, logos, extension code, or proprietary assets.
 
-## Command-line usage
+## Linux command-line usage
 
 ```text
 hive-ipp-bridge setup
@@ -54,7 +55,102 @@ Full removal also deletes the installed Python files and the managed
 For upgrades from the working prototype, uninstall also recognizes the legacy
 `PaperCut_Hive` queue and removes it only when it uses the expected bridge URI.
 
-## First-time installation
+## Windows support
+
+Windows 10 and Windows 11 x64 are supported. The packaged Windows application
+does not require Python or pip on classroom workstations. See the complete
+[Windows setup and classroom deployment guide](General/WINDOWS_SETUP.md) for
+prerequisites, upgrades, verification, security details, and troubleshooting.
+
+The Windows path is:
+
+```text
+Windows Print Spooler
+  -> Microsoft IPP Class Driver
+  -> private per-user http://127.0.0.1:8631/ipp/<route>/print
+  -> Hive IPP Bridge Windows service
+  -> the signed-in user's PaperCut Hive profile
+```
+
+The administrator installs the machine portion once. Each signed-in user then
+enrolls without UAC and receives a separate SID-owned **Hive IPP Bridge
+(user-id)** printer, private route, and DPAPI-protected PaperCut profile.
+
+### Windows quick start
+
+Build the deployment bundle on Windows:
+
+```powershell
+.\packaging\windows\build-installer.ps1
+```
+
+Copy these two resulting files together:
+
+```text
+dist\installer\HiveIPPBridge-Setup.exe
+dist\installer\install-system.ps1
+```
+
+An administrator runs the system installation once:
+
+```powershell
+.\install-system.ps1
+```
+
+Then each classroom user signs in and runs this normally, not as administrator:
+
+```powershell
+& "$env:ProgramFiles\Hive IPP Bridge\Install-User.ps1"
+```
+
+Each user needs their own PaperCut Hive Classic Invitation setup link.
+
+### Windows verification
+
+From the user's normal PowerShell session:
+
+```powershell
+& "$env:ProgramFiles\Hive IPP Bridge\HiveIPPBridge.exe" status
+& "$env:ProgramFiles\Hive IPP Bridge\HiveIPPBridge.exe" test .\document.pdf
+```
+
+The machine has two automatic services. `HiveIPPBridge` runs as LocalService
+and owns the encrypted multi-user vault and localhost IPP listener.
+`HiveIPPBridgeProvisioner` is a credential-blind LocalSystem broker restricted
+to managing verified per-user queues. PaperCut credentials never go to the
+provisioner, printer URLs, command-line arguments, environment variables, or
+logs.
+
+### Windows removal
+
+Remove only the signed-in user's queue and profile without UAC:
+
+```powershell
+& "$env:ProgramFiles\Hive IPP Bridge\Uninstall-User.ps1"
+```
+
+Remove the services, all managed queues, and installed files with one UAC
+prompt while preserving encrypted profiles for reinstall:
+
+```powershell
+& "$env:ProgramFiles\Hive IPP Bridge\Uninstall-System.ps1"
+```
+
+Add `-PurgeUserData` to permanently remove all encrypted profiles as well.
+
+### Windows build
+
+The combined script requires 64-bit CPython 3.12 or newer and Inno Setup 7 x64
+or Inno Setup 6. It runs tests, builds the PyInstaller onedir application under
+`dist\HiveIPPBridge`, compiles `HiveIPPBridge-Setup.exe`, and places the system
+install script beside it. PyInstaller is not a cross-compiler; build Windows
+artifacts on Windows.
+
+The project remains an independent interoperability implementation and must
+not include PaperCut proprietary source, extensions, icons, certificates,
+credentials, or captured network artifacts.
+
+## Linux first-time installation
 
 After downloading and extracting a release, run its top-level installer:
 
@@ -88,11 +184,12 @@ The user receives an email with a green **Get Started** button. Right-click the
 button and copy the link. It looks like
 `https://hive.papercut.com/setup-instructions?t=eyJ…`.
 
-When running `hive-ipp-bridge setup`, paste the copied link at the prompt.
+When running Linux `hive-ipp-bridge setup` or Windows `Install-User.ps1`, paste
+the copied link at the prompt.
 
 Each setup link is tied to a specific user. If enrollment fails or the link
-expires, send a new Classic Invitation from the admin console and run
-`hive-ipp-bridge setup` again.
+expires, send a new Classic Invitation from the admin console and rerun the
+platform's user setup command.
 
 If you are not a PaperCut Hive administrator, ask your IT administrator to
 send you a Classic Invitation email.
