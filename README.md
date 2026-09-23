@@ -104,6 +104,9 @@ Then each user signs in and runs this normally, not as administrator:
 ```
 
 Each user needs their own PaperCut Hive Classic Invitation setup link.
+For remote deployment tools such as PDQ Deploy running as the logged-on user,
+pass the link as `-InviteLink "https://hive.papercut.com/setup-instructions?t=..."`
+to `Install-User.ps1` instead of responding to the prompt.
 
 ### Windows verification
 

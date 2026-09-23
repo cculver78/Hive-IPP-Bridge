@@ -1,3 +1,8 @@
+param(
+    [Parameter(Position = 0)]
+    [string]$InviteLink
+)
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -12,7 +17,14 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     throw "Hive IPP Bridge is not installed. Ask an administrator to run install-system.ps1 first."
 }
 
-& $executable setup
+if ($PSBoundParameters.ContainsKey("InviteLink")) {
+    if ([string]::IsNullOrWhiteSpace($InviteLink)) {
+        throw "InviteLink cannot be empty when supplied."
+    }
+    $InviteLink | & $executable setup
+} else {
+    & $executable setup
+}
 if ($LASTEXITCODE -ne 0) {
     throw "Hive IPP Bridge user setup failed with exit code $LASTEXITCODE."
 }

@@ -92,7 +92,18 @@ PowerShell window and run:
 & "$env:ProgramFiles\Hive IPP Bridge\Install-User.ps1"
 ```
 
-Paste that user's PaperCut Hive Classic Invitation setup link when prompted.
+Paste that user's PaperCut Hive Classic Invitation setup link when prompted. For
+remote deployment tools such as PDQ Deploy running as the logged-on user, pass
+the link as the script's first argument instead:
+
+```powershell
+& "$env:ProgramFiles\Hive IPP Bridge\Install-User.ps1" -InviteLink "https://hive.papercut.com/setup-instructions?t=..."
+```
+
+The wrapper supplies the link to the setup command through standard input; it
+is not added to the executable's argument list. The link is still a one-time
+secret, so protect the PDQ package and deployment logs accordingly.
+
 The script will:
 
 1. enroll the current Windows SID with that user's PaperCut account;

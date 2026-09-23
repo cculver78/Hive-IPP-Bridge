@@ -1,5 +1,6 @@
 # Changelog
 
+- Allow `Install-User.ps1` to receive a PaperCut Hive invitation link for non-interactive per-user deployment tools such as PDQ Deploy.
 - Keep Windows listener tests skippable in Linux environments that prohibit local socket binding.
 - Fix Windows system uninstallation to request the service deletion access right from the correct pywin32 module.
 - Make Windows ProgramData ACLs inheritable so Administrators can inspect service-created logs, and return safe control-pipe processing diagnostics instead of silently disconnecting clients.
