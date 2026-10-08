@@ -8,3 +8,4 @@ dist/
 .venv-windows/
 pkg/
 srcpkg/
+.python-version
