@@ -41,6 +41,9 @@ def require_commands(names: tuple[str, ...]) -> bool:
     missing = [name for name in names if shutil.which(name) is None]
     if missing:
         print(f"error: required command(s) not found: {', '.join(missing)}", file=sys.stderr)
+        if "ippeveprinter" in missing:
+            print("On Fedora, install ippeveprinter with: sudo dnf install cups-printerapp",
+                  file=sys.stderr)
         return False
     return True
 

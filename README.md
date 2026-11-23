@@ -155,6 +155,18 @@ credentials, or captured network artifacts.
 
 ## Linux first-time installation
 
+The system needs Python 3.10 or newer, systemd, CUPS (including `lpadmin` and
+`lpstat`), `secret-tool`, and `ippeveprinter`, plus a running desktop keyring.
+On Fedora, install the system prerequisites and start CUPS first:
+
+```bash
+sudo dnf install python3 cups cups-client cups-printerapp libsecret
+sudo systemctl enable --now cups.service
+```
+
+Fedora packages `ippeveprinter` separately in `cups-printerapp`. If setup reports
+that command is missing, install that package and rerun `./install.sh`.
+
 After downloading and extracting a release, run its top-level installer:
 
 ```bash
@@ -162,7 +174,8 @@ After downloading and extracting a release, run its top-level installer:
 ```
 
 This single command installs `hive-ipp-bridge` in `~/.local/bin` and immediately
-starts interactive setup. No root access or Python package manager is required.
+starts interactive setup. Once the system prerequisites are installed, this
+command requires no root access or Python package manager.
 Once setup completes, a CUPS printer named **Hive_IPP_Bridge** appears in print
 dialogs. Afterward, use `hive-ipp-bridge setup` to repair or repeat
 configuration. Package manager installations will install the command directly
